@@ -8,7 +8,7 @@ export default function Home() {
   const router = useRouter();
 
   useEffect(() => {
-    router.replace("/login"); // Redirect ke /login
+    router.replace("/login/"); // Redirect ke /login
   }, [router]);
 
   return null; // Tidak perlu render apapun
