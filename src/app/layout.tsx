@@ -4,7 +4,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { onAuthStateChanged } from "firebase/auth";
-import { auth } from "@/lib/firebase"; // pastikan path sesuai
+import { auth } from ".././../lib/firebase"; // pastikan path sesuai
 
 export default function HomePage() {
   const router = useRouter();
