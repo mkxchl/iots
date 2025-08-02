@@ -1,34 +1,40 @@
-// app/page.tsx
-"use client";
+import type { Metadata } from "next";
+import { Geist, Geist_Mono } from "next/font/google";
+import "./globals.css";
 
-import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
-import { onAuthStateChanged } from "firebase/auth";
-import { auth } from ".././../lib/firebase"; // pastikan path sesuai
+const geistSans = Geist({
+  variable: "--font-geist-sans",
+  subsets: ["latin"],
+});
 
-export default function HomePage() {
-  const router = useRouter();
-  const [loading, setLoading] = useState(true);
+const geistMono = Geist_Mono({
+  variable: "--font-geist-mono",
+  subsets: ["latin"],
+});
 
-  useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, (user) => {
-      if (!user) {
-        router.replace("/login"); // Redirect kalau belum login
-      } else {
-        setLoading(false); // Tampilkan halaman jika sudah login
-      }
-    });
+export const metadata: Metadata = {
+  title: "Andre - Iot",
+  description: "",
+};
 
-    return () => unsubscribe();
-  }, [router]);
-
-  if (loading) {
-    return <div className="p-4">Loading...</div>;
-  }
-
+export default function RootLayout({
+  children,
+}: Readonly<{
+  children: React.ReactNode;
+}>) {
   return (
-    <div className="p-4">
-      <h1 className="text-xl font-bold">Selamat datang, kamu sudah login!</h1>
-    </div>
+    <html lang="en">
+      <head>
+      <link
+        href="https://unpkg.com/boxicons@2.1.4/css/boxicons.min.css"
+        rel="stylesheet"
+      />
+      </head>
+      <body
+        className={`${geistSans.variable} ${geistMono.variable} antialiased`}
+      >
+        {children}
+      </body>
+    </html>
   );
 }
