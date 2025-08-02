@@ -86,29 +86,30 @@ export default function LampuDashboard() {
     }
   };
 
-  const toggleLampu = async (key: LampuKey) => {
-    setIsToggling(key);
-    try {
-      await fetch(`${endpoint}/${key}`, { method: "POST" });
-      await fetchLampuState(key);
-      await logLampuAction(key, !lampu[key]);
-      await fetchLogs();
+ const toggleLampu = async (key: LampuKey) => {
+  setIsToggling(key);
+  try {
+    await fetch(`${endpoint}/${key}`, { method: "POST" });
+    await fetchLampuState(key);
+    await logLampuAction(key, !lampu[key]);
+    await fetchLogs();
 
-      Swal.fire({
-        icon: "success",
-        title: `Lampu ${key} ${!lampu[key] ? "dinyalakan" : "dimatikan"}`,
-        timer: 1500,
-        showConfirmButton: false,
-      });
-    } catch (err) {
-      console.error(`Gagal toggle ${key}`, err);
-      Swal.fire({
-        icon: "error",
-        title: `Gagal kontrol lampu ${key}`,
-      });
-    }
-    setIsToggling(null);
-  };
+    Swal.fire({
+      icon: "success",
+      title: `Lampu ${key} ${!lampu[key] ? "dinyalakan" : "dimatikan"}`,
+      timer: 1500,
+      showConfirmButton: false,
+    });
+  } catch (err) {
+    console.error(`Gagal toggle ${key}`, err);
+    Swal.fire({
+      icon: "error",
+      title: `Gagal kontrol lampu ${key}`,
+    });
+  } finally {
+    setIsToggling(null); // <-- ini penting
+  }
+};
 
   const logLampuAction = async (key: LampuKey, state: boolean) => {
     if (!userEmail) return;
