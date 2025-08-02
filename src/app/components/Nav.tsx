@@ -107,15 +107,7 @@ const Navbar = () => {
       {isOpen && (
         <div className="lg:hidden bg-white px-4 pb-4 shadow-md">
           <nav className="space-y-2">
-            {navItems.map((item) => (
-              <Link
-                key={item}
-                href="#"
-                className="block text-gray-700 py-2 hover:text-indigo-600"
-              >
-                {item}
-              </Link>
-            ))}
+            
             {user ? (
               <div className="mt-4 border-t pt-4 flex items-center justify-between">
                 <div className="flex items-center gap-2">
