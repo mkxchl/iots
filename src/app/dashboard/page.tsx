@@ -2,11 +2,19 @@
 
 import React, { useEffect, useRef, useState } from "react";
 import mqtt, { MqttClient, IClientOptions } from "mqtt";
-import { auth, db } from "../../../lib/firebase"; // sesuaikan path
-import { onAuthStateChanged, User } from "firebase/auth";
-import { doc, getDoc } from "firebase/firestore";
 
-// Topik lampu
+/**
+ * Single-file Next.js client component that:
+ * - connects to an MQTT broker via WebSocket (wss)
+ * - subscribes to topics lampu/dapur, lampu/tamu, lampu/makan
+ * - allows publishing ON/OFF to each topic
+ *
+ * Requirements:
+ * - npm install mqtt
+ * - .env.local with NEXT_PUBLIC_MQTT_URL, NEXT_PUBLIC_MQTT_USER, NEXT_PUBLIC_MQTT_PASS
+ */
+
+// Topik yang dipakai
 const TOPICS = {
   dapur: "lampu/dapur",
   tamu: "lampu/tamu",
@@ -22,14 +30,21 @@ function createClient(): MqttClient {
   const password = process.env.NEXT_PUBLIC_MQTT_PASS;
   const prefix = process.env.NEXT_PUBLIC_MQTT_CLIENT_PREFIX ?? "nextjs_";
 
-  if (!url || !username || !password) throw new Error("Missing env vars");
+  if (!url || !username || !password) {
+    throw new Error(
+      "Missing env vars. Please set NEXT_PUBLIC_MQTT_URL, NEXT_PUBLIC_MQTT_USER, NEXT_PUBLIC_MQTT_PASS in .env.local"
+    );
+  }
 
-  return mqtt.connect(url, {
+  // Jangan set protocol di options — URL 'wss://' sudah menentukan protokol
+  const options: IClientOptions = {
     username,
     password,
     reconnectPeriod: 3000,
-    clientId: `${prefix}${Math.floor(Math.random() * 10000)}`,
-  });
+    clientId: ${prefix}${Math.floor(Math.random() * 10000)},
+  };
+
+  return mqtt.connect(url, options);
 }
 
 export default function Page() {
@@ -41,26 +56,7 @@ export default function Page() {
     makan: "UNKNOWN",
   });
   const [log, setLog] = useState<string[]>([]);
-  const [user, setUser] = useState<User | null>(null);
-  const [role, setRole] = useState<string>("guest"); // default guest
 
-  // Auth & fetch role
-  useEffect(() => {
-    const unsub = onAuthStateChanged(auth, async (u) => {
-      setUser(u);
-      if (u) {
-        const docRef = doc(db, "users", u.uid);
-        const docSnap = await getDoc(docRef);
-        if (docSnap.exists()) {
-          const data = docSnap.data();
-          setRole(data.role ?? "guest");
-        }
-      }
-    });
-    return () => unsub();
-  }, []);
-
-  // MQTT connection
   useEffect(() => {
     let mounted = true;
     let client: MqttClient;
@@ -69,20 +65,21 @@ export default function Page() {
       client = createClient();
     } catch (err: any) {
       console.error(err);
-      setLog((l) => [...l, `ENV ERROR: ${err.message}`]);
+      setLog((l) => [...l, ENV ERROR: ${err.message}]);
       return;
     }
 
     clientRef.current = client;
 
     const pushLog = (s: string) => {
-      if (!mounted) return;
-      if (role === "admin") setLog((l) => [new Date().toLocaleTimeString() + " • " + s, ...l].slice(0, 100));
+      setLog((l) => [new Date().toLocaleTimeString() + " • " + s, ...l].slice(0, 100));
     };
 
     client.on("connect", () => {
+      if (!mounted) return;
       setConnected(true);
       pushLog("Connected to MQTT broker");
+      // subscribe all lamp topics
       client.subscribe(Object.values(TOPICS), { qos: 0 }, (err) => {
         if (err) pushLog("Subscribe error: " + String(err));
         else pushLog("Subscribed to lampu topics");
@@ -90,34 +87,43 @@ export default function Page() {
     });
 
     client.on("reconnect", () => {
+      if (!mounted) return;
       setConnected(false);
       pushLog("Reconnecting...");
     });
 
     client.on("close", () => {
+      if (!mounted) return;
       setConnected(false);
       pushLog("Connection closed");
     });
 
     client.on("error", (err) => {
+      if (!mounted) return;
       pushLog("MQTT Error: " + String(err));
-      console.error(err);
+      console.error("MQTT Error", err);
     });
 
     client.on("message", (topic, payload) => {
+      if (!mounted) return;
       const msg = payload.toString().trim();
-      pushLog(`Recv ${topic} -> ${msg}`);
+      pushLog(Recv ${topic} -> ${msg});
       if (topic === TOPICS.dapur) setStatus((s) => ({ ...s, dapur: msg === "ON" ? "ON" : "OFF" }));
       if (topic === TOPICS.tamu) setStatus((s) => ({ ...s, tamu: msg === "ON" ? "ON" : "OFF" }));
       if (topic === TOPICS.makan) setStatus((s) => ({ ...s, makan: msg === "ON" ? "ON" : "OFF" }));
     });
 
+    // cleanup
     return () => {
       mounted = false;
-      client.end(true);
+      try {
+        client.end(true);
+      } catch (e) {
+        console.warn("Error closing client", e);
+      }
       clientRef.current = null;
     };
-  }, [role]);
+  }, []);
 
   const publish = (topic: string, message: string) => {
     const client = clientRef.current;
@@ -126,34 +132,54 @@ export default function Page() {
       return;
     }
     client.publish(topic, message, { qos: 0 }, (err) => {
-      if (err) console.error(err);
-      if (role === "admin") {
+      if (err) {
+        setLog((l) => [new Date().toLocaleTimeString() + " • Publish err: " + String(err), ...l].slice(0, 100));
+        console.error("Publish err", err);
+      } else {
         setLog((l) => [new Date().toLocaleTimeString() + ` • Publish ${topic} -> ${message}`, ...l].slice(0, 100));
+        // optimistic update
+        if (topic === TOPICS.dapur) setStatus((s) => ({ ...s, dapur: message === "ON" ? "ON" : "OFF" }));
+        if (topic === TOPICS.tamu) setStatus((s) => ({ ...s, tamu: message === "ON" ? "ON" : "OFF" }));
+        if (topic === TOPICS.makan) setStatus((s) => ({ ...s, makan: message === "ON" ? "ON" : "OFF" }));
       }
-      // optimistic UI
-      if (topic === TOPICS.dapur) setStatus((s) => ({ ...s, dapur: message === "ON" ? "ON" : "OFF" }));
-      if (topic === TOPICS.tamu) setStatus((s) => ({ ...s, tamu: message === "ON" ? "ON" : "OFF" }));
-      if (topic === TOPICS.makan) setStatus((s) => ({ ...s, makan: message === "ON" ? "ON" : "OFF" }));
     });
   };
 
   return (
-    <main style={{ padding: 24 }}>
-      <h1>MQTT Lampu Dashboard</h1>
-      <p>Connection: <strong style={{ color: connected ? "green" : "red" }}>{connected ? "Connected" : "Disconnected"}</strong></p>
+    <main style={{ padding: 24, fontFamily: "system-ui, Arial" }}>
+      <h1>MQTT Lampu Dashboard (Next.js single-file)</h1>
+      <p>
+        Connection:{" "}
+        <strong style={{ color: connected ? "green" : "red" }}>{connected ? "Connected" : "Disconnected"}</strong>
+      </p>
 
-      <div style={{ display: "flex", gap: 16 }}>
+      <div style={{ display: "flex", gap: 18, marginTop: 18, flexWrap: "wrap" }}>
         {(["dapur", "tamu", "makan"] as LampKey[]).map((k) => (
-          <div key={k} style={{ border: "1px solid #ddd", padding: 12, borderRadius: 6 }}>
-            <h3 style={{ textTransform: "capitalize" }}>{k}</h3>
-            <p>Status: {status[k]}</p>
-            <button onClick={() => publish(TOPICS[k], "ON")}>ON</button>
-            <button onClick={() => publish(TOPICS[k], "OFF")}>OFF</button>
+          <div
+            key={k}
+            style={{
+              border: "1px solid #ddd",
+              padding: 16,
+              borderRadius: 8,
+              width: 220,
+              textAlign: "center",
+              boxShadow: "0 3px 10px rgba(0,0,0,0.04)",
+            }}
+          >
+            <h3 style={{ textTransform: "capitalize", marginBottom: 8 }}>{k}</h3>
+            <div style={{ marginBottom: 10 }}>Status: <strong>{status[k]}</strong></div>
+            <div style={{ display: "flex", justifyContent: "center", gap: 8 }}>
+              <button onClick={() => publish(TOPICS[k], "ON")} style={{ padding: "8px 12px" }}>
+                ON
+              </button>
+              <button onClick={() => publish(TOPICS[k], "OFF")} style={{ padding: "8px 12px" }}>
+                OFF
+              </button>
+            </div>
           </div>
         ))}
       </div>
-
-      {role === "admin" && (
+        {role === "admin" && (
         <section style={{ marginTop: 24 }}>
           <h2>Activity Log (Admin only)</h2>
           <div style={{ maxHeight: 200, overflow: "auto", border: "1px solid #eee", padding: 8 }}>
@@ -162,5 +188,5 @@ export default function Page() {
         </section>
       )}
     </main>
-  );
+    );
 }
