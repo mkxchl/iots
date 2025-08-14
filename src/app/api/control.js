@@ -1,20 +1,33 @@
-export async function POST(request) {
+// pages/api/lampu/[lampu].ts
+import type { NextApiRequest, NextApiResponse } from "next";
+
+// Ganti ini dengan IP lokal ESP kamu
+const ESP_IP = "http://192.168.1.166";
+
+export default async function handler(req: NextApiRequest, res: NextApiResponse) {
+  const { lampu } = req.query; // dapur, tamu, makan
+
+  if (!lampu || typeof lampu !== "string") {
+    return res.status(400).json({ error: "Lampu tidak valid" });
+  }
+
   try {
-    const { device, action } = await request.json();
+    if (req.method === "GET") {
+      // Ambil status lampu dari ESP
+      const response = await fetch(`${ESP_IP}/${lampu}`);
+      const text = await response.text();
+      return res.status(200).json({ status: text });
+    }
 
-    const ESP_IP = "http://192.168.1.166"; // IP lokal ESP32
-    const response = await fetch(`${ESP_IP}/${device}/${action}`, {
-      method: "POST",
-    });
+    if (req.method === "POST") {
+      // Toggle lampu di ESP
+      const response = await fetch(`${ESP_IP}/${lampu}`, { method: "POST" });
+      const text = await response.text();
+      return res.status(200).json({ status: text });
+    }
 
-    const text = await response.text();
-
-    return new Response(JSON.stringify({ status: text }), {
-      headers: { "Content-Type": "application/json" },
-    });
-  } catch (err) {
-    return new Response(JSON.stringify({ error: err.message }), {
-      status: 500,
-    });
+    return res.status(405).json({ error: "Metode tidak diizinkan" });
+  } catch (error) {
+    return res.status(500).json({ error: "Tidak bisa terhubung ke ESP" });
   }
 }
