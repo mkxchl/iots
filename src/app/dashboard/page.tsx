@@ -71,14 +71,19 @@ export default function Page() {
       client = createClient();
     } catch (err: any) {
       console.error(err);
-      setLog((l) => [new Date().toLocaleTimeString() + " • ENV ERROR: " + err.message, ...l]);
+      setLog((l) => [
+        new Date().toLocaleTimeString() + " • ENV ERROR: " + err.message,
+        ...l,
+      ]);
       return;
     }
 
     clientRef.current = client;
 
     const pushLog = (s: string) => {
-      setLog((l) => [new Date().toLocaleTimeString() + " • " + s, ...l].slice(0, 200));
+      setLog((l) =>
+        [new Date().toLocaleTimeString() + " • " + s, ...l].slice(0, 200)
+      );
     };
 
     client.on("connect", () => {
@@ -113,9 +118,12 @@ export default function Page() {
       if (!mounted) return;
       const msg = payload.toString().trim();
       pushLog(`Recv ${topic} -> ${msg}`);
-      if (topic === TOPICS.dapur) setStatus((s) => ({ ...s, dapur: msg === "ON" ? "ON" : "OFF" }));
-      if (topic === TOPICS.tamu) setStatus((s) => ({ ...s, tamu: msg === "ON" ? "ON" : "OFF" }));
-      if (topic === TOPICS.makan) setStatus((s) => ({ ...s, makan: msg === "ON" ? "ON" : "OFF" }));
+      if (topic === TOPICS.dapur)
+        setStatus((s) => ({ ...s, dapur: msg === "ON" ? "ON" : "OFF" }));
+      if (topic === TOPICS.tamu)
+        setStatus((s) => ({ ...s, tamu: msg === "ON" ? "ON" : "OFF" }));
+      if (topic === TOPICS.makan)
+        setStatus((s) => ({ ...s, makan: msg === "ON" ? "ON" : "OFF" }));
     });
 
     return () => {
@@ -137,14 +145,28 @@ export default function Page() {
     }
     client.publish(topic, message, { qos: 0 }, (err) => {
       if (err) {
-        setLog((l) => [new Date().toLocaleTimeString() + " • Publish err: " + String(err), ...l].slice(0, 200));
+        setLog((l) =>
+          [
+            new Date().toLocaleTimeString() + " • Publish err: " + String(err),
+            ...l,
+          ].slice(0, 200)
+        );
         console.error("Publish err", err);
       } else {
-        setLog((l) => [new Date().toLocaleTimeString() + ` • Publish ${topic} -> ${message}`, ...l].slice(0, 200));
+        setLog((l) =>
+          [
+            new Date().toLocaleTimeString() +
+              ` • Publish ${topic} -> ${message}`,
+            ...l,
+          ].slice(0, 200)
+        );
         // optimistic UI:
-        if (topic === TOPICS.dapur) setStatus((s) => ({ ...s, dapur: message === "ON" ? "ON" : "OFF" }));
-        if (topic === TOPICS.tamu) setStatus((s) => ({ ...s, tamu: message === "ON" ? "ON" : "OFF" }));
-        if (topic === TOPICS.makan) setStatus((s) => ({ ...s, makan: message === "ON" ? "ON" : "OFF" }));
+        if (topic === TOPICS.dapur)
+          setStatus((s) => ({ ...s, dapur: message === "ON" ? "ON" : "OFF" }));
+        if (topic === TOPICS.tamu)
+          setStatus((s) => ({ ...s, tamu: message === "ON" ? "ON" : "OFF" }));
+        if (topic === TOPICS.makan)
+          setStatus((s) => ({ ...s, makan: message === "ON" ? "ON" : "OFF" }));
       }
     });
   };
@@ -170,14 +192,16 @@ export default function Page() {
             </div>
 
             <div className="flex items-center gap-4">
-              <div className="text-sm text-gray-600">
+              <div className="text-sm text-gray-600 flex items-center gap-2">
                 {user ? (
                   <>
-                    <span className="mr-2 hidden sm:inline">Signed in as</span>
                     <img
-                      src={user.photoURL || "https://ui-avatars.com/api/?name=User&background=random"}
+                      src={
+                        user.photoURL ||
+                        "https://ui-avatars.com/api/?name=User&background=random"
+                      }
                       alt="User Avatar"
-                      className="w-8 h-8 rounded-full border"
+                      className="w-8 h-8 rounded-full shadow-md"
                       referrerPolicy="no-referrer"
                     />
                   </>
@@ -188,8 +212,9 @@ export default function Page() {
 
               <button
                 onClick={handleLogout}
-                className="bg-red-500 hover:bg-red-600 text-white text-sm px-3 py-1 rounded-md shadow-sm"
+                className="  text-black text-sm px-3 py-1 flex items-center gap-1 cursor-pointer border-none"
               >
+                <i className="bx bx-log-out text-lg"></i>
                 Logout
               </button>
             </div>
@@ -201,14 +226,18 @@ export default function Page() {
       <main className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <div className="mb-6 flex items-center justify-between">
           <div>
-            <h1 className="text-2xl font-semibold text-gray-800">Kontrol Lampu</h1>
+            <h1 className="text-2xl font-semibold text-gray-800">
+              Kontrol Lampu
+            </h1>
             <p className="text-sm text-gray-500">Hubungkan via HiveMQ</p>
           </div>
 
           <div className="flex items-center gap-4">
             <div
               className={`px-3 py-1 rounded-md text-sm font-medium ${
-                connected ? "bg-green-100 text-green-800" : "bg-red-100 text-red-800"
+                connected
+                  ? "bg-green-100 text-green-800"
+                  : "bg-red-100 text-red-800"
               }`}
             >
               {connected ? "Connected" : "Disconnected"}
@@ -245,7 +274,9 @@ export default function Page() {
           {(["dapur", "tamu", "makan"] as LampKey[]).map((k) => (
             <div key={k} className="bg-white rounded-lg shadow p-6">
               <div className="flex items-center justify-between">
-                <h2 className="text-lg font-semibold text-gray-800 capitalize">{k}</h2>
+                <h2 className="text-lg font-semibold text-gray-800 capitalize">
+                  {k}
+                </h2>
                 <div
                   className={`w-10 h-10 rounded-full flex items-center justify-center ${
                     status[k] === "ON" ? "bg-yellow-400" : "bg-gray-200"
@@ -287,7 +318,9 @@ export default function Page() {
         {/* Activity / Log */}
         <section className="mt-8 bg-white rounded-lg shadow p-4">
           <div className="flex items-center justify-between mb-3">
-            <h3 className="text-lg font-semibold text-gray-700">Activity Log</h3>
+            <h3 className="text-lg font-semibold text-gray-700">
+              Activity Log
+            </h3>
             <small className="text-sm text-gray-500">Recent messages</small>
           </div>
           <div className="max-h-48 overflow-auto">
