@@ -135,7 +135,7 @@ const fetchLampuState = async (key: LampuKey) => {
 const toggleLampu = async (key: LampuKey) => {
   setIsToggling(key);
   try {
-    await fetch(`/api/lampu/${key}`, { method: "POST" });
+    await fetch(`/api/control${key}`, { method: "POST" });
     await fetchLampuState(key);
     await logLampuAction(key, !lampu[key]);
     await fetchLogs();
