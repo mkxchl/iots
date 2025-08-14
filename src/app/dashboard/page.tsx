@@ -4,7 +4,7 @@ import React, { useEffect, useRef, useState } from "react";
 import mqtt, { MqttClient, IClientOptions } from "mqtt";
 import { onAuthStateChanged, signOut, User } from "firebase/auth";
 import { useRouter } from "next/navigation";
-import { auth } from "../../lib/firebase"; // sesuaikan path jika perlu
+import { auth } from "../../../lib/firebase"; // sesuaikan path jika perlu
 
 /**
  * Single-file Next.js client component:
