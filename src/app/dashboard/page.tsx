@@ -19,8 +19,6 @@ import {
 } from "firebase/firestore";
 import Swal from "sweetalert2";
 
-const endpoint = "http://192.168.1.166";
-
 type LampuKey = "dapur" | "tamu" | "makan";
 type LampuState = { [key in LampuKey]: boolean };
 
@@ -75,37 +73,6 @@ export default function LampuDashboard() {
     );
   };
 
-  const fetchLampuState = async (key: LampuKey) => {
-    try {
-      const res = await fetch(`${endpoint}/${key}`);
-      const state = await res.text();
-      setLampu((prev) => ({ ...prev, [key]: state === "ON" }));
-    } catch {}
-  };
-
-  const toggleLampu = async (key: LampuKey) => {
-    setIsToggling(key);
-    try {
-      await fetch(`${endpoint}/${key}`, { method: "POST" });
-      await fetchLampuState(key);
-      await logLampuAction(key, !lampu[key]);
-      await fetchLogs();
-
-      Swal.fire({
-        icon: "success",
-        title: `Lampu ${key} ${!lampu[key] ? "dinyalakan" : "dimatikan"}`,
-        timer: 1500,
-        showConfirmButton: false,
-      });
-    } catch (err) {
-      Swal.fire({
-        icon: "error",
-        title: `Gagal kontrol lampu ${key}`,
-      });
-    }
-    setIsToggling(null);
-  };
-
   const logLampuAction = async (key: LampuKey, state: boolean) => {
     if (!userEmail) return;
     try {
@@ -157,23 +124,55 @@ export default function LampuDashboard() {
     router.push("/login");
   };
 
-  const nyalakanSemua = async () => {
-    for (const key of ["dapur", "tamu", "makan"] as LampuKey[]) {
-      await fetch(`${endpoint}/${key}`, { method: "POST" });
-      await logLampuAction(key, true);
-    }
-    fetchLampuStates();
-    fetchLogs();
-  };
+const fetchLampuState = async (key: LampuKey) => {
+  try {
+    const res = await fetch(`/api/lampu/${key}`);
+    const data = await res.json();
+    setLampu((prev) => ({ ...prev, [key]: data.status === "ON" }));
+  } catch {}
+};
 
-  const matikanSemua = async () => {
-    for (const key of ["dapur", "tamu", "makan"] as LampuKey[]) {
-      await fetch(`${endpoint}/${key}`, { method: "POST" });
-      await logLampuAction(key, false);
-    }
-    fetchLampuStates();
-    fetchLogs();
-  };
+const toggleLampu = async (key: LampuKey) => {
+  setIsToggling(key);
+  try {
+    await fetch(`/api/lampu/${key}`, { method: "POST" });
+    await fetchLampuState(key);
+    await logLampuAction(key, !lampu[key]);
+    await fetchLogs();
+
+    Swal.fire({
+      icon: "success",
+      title: `Lampu ${key} ${!lampu[key] ? "dinyalakan" : "dimatikan"}`,
+      timer: 1500,
+      showConfirmButton: false,
+    });
+  } catch (err) {
+    Swal.fire({
+      icon: "error",
+      title: `Gagal kontrol lampu ${key}`,
+    });
+  }
+  setIsToggling(null);
+};
+
+const nyalakanSemua = async () => {
+  for (const key of ["dapur", "tamu", "makan"] as LampuKey[]) {
+    await fetch(`/api/lampu/${key}`, { method: "POST" });
+    await logLampuAction(key, true);
+  }
+  fetchLampuStates();
+  fetchLogs();
+};
+
+const matikanSemua = async () => {
+  for (const key of ["dapur", "tamu", "makan"] as LampuKey[]) {
+    await fetch(`/api/lampu/${key}`, { method: "POST" });
+    await logLampuAction(key, false);
+  }
+  fetchLampuStates();
+  fetchLogs();
+};
+
 
   const hapusSemuaLog = async () => {
     const confirm = await Swal.fire({
