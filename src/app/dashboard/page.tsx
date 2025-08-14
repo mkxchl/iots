@@ -46,7 +46,7 @@ export default function Home() {
 
   return (
     <div style={{ padding: 20 }}>
-      <h1>Kontrol Lampu MQTT</h1>
+      <h1>Kontrol Lampu MQT</h1>
       <p>Status koneksi: {connected ? "Terhubung" : "Terputus"}</p>
 
       <div>
