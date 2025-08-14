@@ -174,7 +174,12 @@ export default function Page() {
                 {user ? (
                   <>
                     <span className="mr-2 hidden sm:inline">Signed in as</span>
-                    <span className="font-medium">{user.email}</span>
+                    <img
+                      src={user.photoURL || "https://ui-avatars.com/api/?name=User&background=random"}
+                      alt="User Avatar"
+                      className="w-8 h-8 rounded-full border"
+                      referrerPolicy="no-referrer"
+                    />
                   </>
                 ) : (
                   <span className="text-gray-400">Not signed in</span>
