@@ -174,7 +174,7 @@ export default function Page() {
                 {user ? (
                   <>
                     <span className="mr-2 hidden sm:inline">Signed in as</span>
-                    <span className="font-medium">{user.name}</span>
+                    <span className="font-medium">{user.email}</span>
                   </>
                 ) : (
                   <span className="text-gray-400">Not signed in</span>
