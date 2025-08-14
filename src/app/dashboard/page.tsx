@@ -6,18 +6,6 @@ import { onAuthStateChanged, signOut, User } from "firebase/auth";
 import { useRouter } from "next/navigation";
 import { auth } from "../../../lib/firebase"; // sesuaikan path jika perlu
 
-/**
- * Single-file Next.js client component:
- * - Tailwind UI (Navbar + logout)
- * - MQTT (wss) client-side
- * - publish/subscribe ke topik lampu/dapur, lampu/tamu, lampu/makan
- *
- * Requirements:
- * - Tailwind CSS configured
- * - npm install mqtt
- * - .env.local: NEXT_PUBLIC_MQTT_URL, NEXT_PUBLIC_MQTT_USER, NEXT_PUBLIC_MQTT_PASS, NEXT_PUBLIC_MQTT_CLIENT_PREFIX (opsional)
- */
-
 // Topics
 const TOPICS = {
   dapur: "lampu/dapur",
@@ -178,8 +166,7 @@ export default function Page() {
         <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-16">
             <div className="flex items-center gap-4">
-              <div className="text-2xl font-bold text-indigo-600">IoT Dashboard</div>
-              <div className="text-sm text-gray-500">MQTT • Realtime</div>
+              <div className="text-2xl font-bold text-indigo-600">IoT App</div>
             </div>
 
             <div className="flex items-center gap-4">
@@ -187,7 +174,7 @@ export default function Page() {
                 {user ? (
                   <>
                     <span className="mr-2 hidden sm:inline">Signed in as</span>
-                    <span className="font-medium">{user.email}</span>
+                    <span className="font-medium">{user.name}</span>
                   </>
                 ) : (
                   <span className="text-gray-400">Not signed in</span>
@@ -210,7 +197,7 @@ export default function Page() {
         <div className="mb-6 flex items-center justify-between">
           <div>
             <h1 className="text-2xl font-semibold text-gray-800">Kontrol Lampu</h1>
-            <p className="text-sm text-gray-500">Hubungkan via HiveMQ / broker MQTT (WSS)</p>
+            <p className="text-sm text-gray-500">Hubungkan via HiveMQ</p>
           </div>
 
           <div className="flex items-center gap-4">
@@ -313,10 +300,6 @@ export default function Page() {
             )}
           </div>
         </section>
-
-        <footer className="mt-6 text-center text-sm text-gray-500">
-          Note: broker credentials are read from <code className="bg-gray-100 px-1 rounded">.env.local</code> (NEXT_PUBLIC_MQTT_URL / USER / PASS).
-        </footer>
       </main>
     </div>
   );
