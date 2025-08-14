@@ -279,17 +279,14 @@ export default function Page() {
                 </h2>
                 <div
                   className={`w-10 h-10 rounded-full flex items-center justify-center ${
-                    status[k] === "ON" ? "bg-yellow-400" : "bg-gray-200"
+                    status[k] === "ON" ? "bg-green-400" : "bg-gray-200"
                   }`}
                 >
-                  <svg
-                    xmlns="http://www.w3.org/2000/svg"
-                    className="h-5 w-5 text-black"
-                    viewBox="0 0 20 20"
-                    fill="currentColor"
-                  >
-                    <path d="M10 2a1 1 0 011 1v2a1 1 0 11-2 0V3a1 1 0 011-1zM4.221 5.221a1 1 0 011.415 0l1.415 1.414a1 1 0 01-1.415 1.415L4.22 6.636a1 1 0 010-1.415zM16.364 6.636a1 1 0 010 1.415l-1.414 1.414a1 1 0 11-1.415-1.415l1.414-1.414a1 1 0 011.415 0zM5 10a5 5 0 1010 0 5 5 0 00-10 0z" />
-                  </svg>
+                  <i
+                    className={`bx bx-bulb text-xl ${
+                      status[k] === "ON" ? "text-white" : "text-gray-500"
+                    }`}
+                  ></i>
                 </div>
               </div>
 
