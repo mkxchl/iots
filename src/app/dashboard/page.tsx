@@ -164,19 +164,31 @@ export default function Page() {
             <div className="text-2xl font-bold text-indigo-600">IoT App</div>
 
             <div className="flex items-center space-x-4">
-              <img
-                src={user?.photoURL || "/default-avatar.png"}
-                alt="User Profile"
-                className="w-8 h-8 rounded-full border"
-              />
+  <img
+    src={user?.photoURL || "/default-avatar.png"}
+    alt="User Profile"
+    className="w-8 h-8 rounded-full border"
+  />
 
-              <button
-                onClick={handleLogout}
-                className="text-black text-sm px-3 py-1 border-none rounded hover:bg-red-500 hover:text-white transition-colors cursor-pointer"
-              >
-                Logout
-              </button>
-            </div>
+  {/* kalau role admin, munculkan icon setting */}
+  {isAdmin && (
+    <button
+      onClick={() => router.push("../admin")}
+      className="text-gray-600 hover:text-black"
+      title="Admin Settings"
+    >
+      <i className="bx bx-cog text-2xl"></i>
+    </button>
+  )}
+
+  <button
+    onClick={handleLogout}
+    className="text-black text-sm px-3 py-1 border-none rounded hover:bg-red-500 hover:text-white transition-colors cursor-pointer"
+  >
+    Logout
+  </button>
+</div>
+
           </div>
         </div>
       </header>
