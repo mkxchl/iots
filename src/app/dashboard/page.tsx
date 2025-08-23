@@ -4,16 +4,19 @@ import React, { useEffect, useRef, useState } from "react";
 import mqtt, { MqttClient, IClientOptions } from "mqtt";
 import { onAuthStateChanged, signOut, User } from "firebase/auth";
 import { useRouter } from "next/navigation";
-import { auth } from "../../../lib/firebase"; // sesuaikan path jika perlu
+import { auth } from "../../../lib/firebase";
+import { doc, getDoc } from "firebase/firestore";
+import { db } from "../../../lib/firebase";
 
-// Topics
 const TOPICS = {
   dapur: "lampu/dapur",
   tamu: "lampu/tamu",
   makan: "lampu/makan",
+  sensor: "sensor/distance",
+  servo: "servo/control",
 } as const;
 
-type LampKey = keyof typeof TOPICS;
+type LampKey = "dapur" | "tamu" | "makan";
 type LampState = "ON" | "OFF" | "UNKNOWN";
 
 function createClient(): MqttClient {
@@ -23,9 +26,7 @@ function createClient(): MqttClient {
   const prefix = process.env.NEXT_PUBLIC_MQTT_CLIENT_PREFIX ?? "nextjs_";
 
   if (!url || !username || !password) {
-    throw new Error(
-      "Missing env vars. Please set NEXT_PUBLIC_MQTT_URL, NEXT_PUBLIC_MQTT_USER, NEXT_PUBLIC_MQTT_PASS in .env.local"
-    );
+    throw new Error("Missing MQTT env vars");
   }
 
   const options: IClientOptions = {
@@ -41,40 +42,49 @@ function createClient(): MqttClient {
 export default function Page() {
   const clientRef = useRef<MqttClient | null>(null);
   const [connected, setConnected] = useState(false);
+  const [sensorOn, setSensorOn] = useState(true);
   const [status, setStatus] = useState<Record<LampKey, LampState>>({
-    dapur: "UNKNOWN",
-    tamu: "UNKNOWN",
-    makan: "UNKNOWN",
+    dapur: "OFF",
+    tamu: "OFF",
+    makan: "OFF",
   });
+
+  const [servoStatus, setServoStatus] = useState<"OPEN" | "CLOSE" | "UNKNOWN">(
+    "UNKNOWN"
+  );
+
+  const [sensorData, setSensorData] = useState<string>("Belum ada data");
   const [log, setLog] = useState<string[]>([]);
   const [user, setUser] = useState<User | null>(null);
+  const [isAdmin, setIsAdmin] = useState(false);
   const router = useRouter();
 
-  // Auth state (so we can show email + logout)
+  // 🔑 Firebase Auth
   useEffect(() => {
-    const unsub = onAuthStateChanged(auth, (u) => {
+    const unsub = onAuthStateChanged(auth, async (u) => {
       setUser(u);
       if (!u) {
-        // jika belum login, redirect ke /login
         router.push("/login");
+        return;
+      }
+      try {
+        const snap = await getDoc(doc(db, "users", u.uid));
+        setIsAdmin(snap.exists() && snap.data().role === "admin");
+      } catch {
+        setIsAdmin(false);
       }
     });
     return () => unsub();
   }, [router]);
 
-  // MQTT connection
+  // 🔌 MQTT Client Setup
   useEffect(() => {
     let mounted = true;
     let client: MqttClient;
-
     try {
       client = createClient();
     } catch (err: any) {
       console.error(err);
-      setLog((l) => [
-        new Date().toLocaleTimeString() + " • ENV ERROR: " + err.message,
-        ...l,
-      ]);
       return;
     }
 
@@ -92,14 +102,8 @@ export default function Page() {
       pushLog("Connected to MQTT broker");
       client.subscribe(Object.values(TOPICS), { qos: 0 }, (err) => {
         if (err) pushLog("Subscribe error: " + String(err));
-        else pushLog("Subscribed to lampu topics");
+        else pushLog("Subscribed to all topics");
       });
-    });
-
-    client.on("reconnect", () => {
-      if (!mounted) return;
-      setConnected(false);
-      pushLog("Reconnecting...");
     });
 
     client.on("close", () => {
@@ -108,31 +112,25 @@ export default function Page() {
       pushLog("Connection closed");
     });
 
-    client.on("error", (err) => {
-      if (!mounted) return;
-      pushLog("MQTT Error: " + String(err));
-      console.error("MQTT Error", err);
-    });
-
     client.on("message", (topic, payload) => {
       if (!mounted) return;
       const msg = payload.toString().trim();
       pushLog(`Recv ${topic} -> ${msg}`);
+
       if (topic === TOPICS.dapur)
         setStatus((s) => ({ ...s, dapur: msg === "ON" ? "ON" : "OFF" }));
       if (topic === TOPICS.tamu)
         setStatus((s) => ({ ...s, tamu: msg === "ON" ? "ON" : "OFF" }));
       if (topic === TOPICS.makan)
         setStatus((s) => ({ ...s, makan: msg === "ON" ? "ON" : "OFF" }));
+      if (topic === TOPICS.sensor) setSensorData(msg);
+      if (topic === TOPICS.servo)
+        setServoStatus(msg === "OPEN" ? "OPEN" : "CLOSE");
     });
 
     return () => {
       mounted = false;
-      try {
-        client.end(true);
-      } catch (e) {
-        console.warn("Error closing client", e);
-      }
+      client.end(true);
       clientRef.current = null;
     };
   }, []);
@@ -143,78 +141,39 @@ export default function Page() {
       alert("Belum terhubung ke broker MQTT");
       return;
     }
-    client.publish(topic, message, { qos: 0 }, (err) => {
-      if (err) {
-        setLog((l) =>
-          [
-            new Date().toLocaleTimeString() + " • Publish err: " + String(err),
-            ...l,
-          ].slice(0, 200)
-        );
-        console.error("Publish err", err);
-      } else {
-        setLog((l) =>
-          [
-            new Date().toLocaleTimeString() +
-              ` • Publish ${topic} -> ${message}`,
-            ...l,
-          ].slice(0, 200)
-        );
-        // optimistic UI:
-        if (topic === TOPICS.dapur)
-          setStatus((s) => ({ ...s, dapur: message === "ON" ? "ON" : "OFF" }));
-        if (topic === TOPICS.tamu)
-          setStatus((s) => ({ ...s, tamu: message === "ON" ? "ON" : "OFF" }));
-        if (topic === TOPICS.makan)
-          setStatus((s) => ({ ...s, makan: message === "ON" ? "ON" : "OFF" }));
-      }
-    });
+    client.publish(topic, message);
   };
+
+  // ✅ Toggle Sensor ON/OFF
 
   const handleLogout = async () => {
     try {
       await signOut(auth);
       router.push("/login");
-    } catch (err) {
-      console.error("Logout error", err);
+    } catch {
       alert("Gagal logout");
     }
   };
 
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* Navbar */}
       <header className="bg-white shadow">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-16">
-            <div className="flex items-center gap-4">
-              <div className="text-2xl font-bold text-indigo-600">IoT App</div>
-            </div>
+            {/* Logo */}
+            <div className="text-2xl font-bold text-indigo-600">IoT App</div>
 
-            <div className="flex items-center gap-4">
-              <div className="text-sm text-gray-600 flex items-center gap-2">
-                {user ? (
-                  <>
-                    <img
-                      src={
-                        user.photoURL ||
-                        "https://ui-avatars.com/api/?name=User&background=random"
-                      }
-                      alt="User Avatar"
-                      className="w-8 h-8 rounded-full shadow-md"
-                      referrerPolicy="no-referrer"
-                    />
-                  </>
-                ) : (
-                  <span className="text-gray-400">Not signed in</span>
-                )}
-              </div>
+            <div className="flex items-center space-x-4">
+              <img
+                src={user?.photoURL || "/default-avatar.png"}
+                alt="User Profile"
+                className="w-8 h-8 rounded-full border"
+              />
 
               <button
                 onClick={handleLogout}
-                className="  text-black text-sm px-3 py-1 flex items-center gap-1 cursor-pointer border-none"
+                className="text-black text-sm px-3 py-1 border-none rounded hover:bg-red-500 hover:text-white transition-colors cursor-pointer"
               >
-                <i className="bx bx-log-out text-lg"></i>
                 Logout
               </button>
             </div>
@@ -222,88 +181,31 @@ export default function Page() {
         </div>
       </header>
 
-      {/* Page content */}
-      <main className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <div className="mb-6 flex items-center justify-between">
-          <div>
-            <h1 className="text-2xl font-semibold text-gray-800">
-              Kontrol Lampu
-            </h1>
-            <p className="text-sm text-gray-500">Hubungkan via HiveMQ</p>
-          </div>
+      <main className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8 text-black">
+        <h1 className="text-2xl font-semibold mb-4">Kontrol IoT</h1>
 
-          <div className="flex items-center gap-4">
-            <div
-              className={`px-3 py-1 rounded-md text-sm font-medium ${
-                connected
-                  ? "bg-green-100 text-green-800"
-                  : "bg-red-100 text-red-800"
-              }`}
-            >
-              {connected ? "Connected" : "Disconnected"}
-            </div>
-            <button
-              onClick={() => {
-                // quick reconnect: end + recreate
-                const c = clientRef.current;
-                try {
-                  c?.end(true);
-                } catch {}
-                // small delay to let previous end
-                setTimeout(() => {
-                  try {
-                    const newClient = createClient();
-                    clientRef.current = newClient;
-                    // reuse same handlers as initial effect won't run again — but simplest is to reload page
-                    // for reliability recommend reload
-                    window.location.reload();
-                  } catch (err) {
-                    alert("Gagal reconnect (cek ENV dan console)");
-                  }
-                }, 300);
-              }}
-              className="bg-indigo-600 text-white px-3 py-1 rounded-md text-sm"
-            >
-              Reconnect
-            </button>
-          </div>
-        </div>
-
-        {/* Cards */}
         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6">
           {(["dapur", "tamu", "makan"] as LampKey[]).map((k) => (
-            <div key={k} className="bg-white rounded-lg shadow p-6">
-              <div className="flex items-center justify-between">
-                <h2 className="text-lg font-semibold text-gray-800 capitalize">
-                  {k}
-                </h2>
+            <div key={k} className="bg-white p-6 rounded-lg shadow">
+              <div className="flex justify-between">
+                <h2 className="text-lg font-semibold capitalize">{k}</h2>
                 <div
-                  className={`w-10 h-10 rounded-full flex items-center justify-center ${
-                    status[k] === "ON" ? "bg-green-400" : "bg-gray-200"
+                  className={`w-6 h-6 rounded-full ${
+                    status[k] === "ON" ? "bg-yellow-400" : "bg-gray-200"
                   }`}
-                >
-                  <i
-                    className={`bx bx-bulb text-xl ${
-                      status[k] === "ON" ? "text-white" : "text-gray-500"
-                    }`}
-                  ></i>
-                </div>
+                />
               </div>
-
-              <p className="mt-4 text-sm text-gray-600">
-                Status: <span className="font-medium">{status[k]}</span>
-              </p>
-
-              <div className="mt-6 flex gap-3">
+              <p className="mt-2">Status: {status[k]}</p>
+              <div className="mt-4 flex gap-2">
                 <button
                   onClick={() => publish(TOPICS[k], "ON")}
-                  className="flex-1 bg-green-500 hover:bg-green-600 text-white py-2 rounded-md shadow-sm"
+                  className="flex-1 bg-green-500 text-white py-2 rounded"
                 >
                   Nyalakan
                 </button>
                 <button
                   onClick={() => publish(TOPICS[k], "OFF")}
-                  className="flex-1 bg-red-500 hover:bg-red-600 text-white py-2 rounded-md shadow-sm"
+                  className="flex-1 bg-red-500 text-white py-2 rounded"
                 >
                   Matikan
                 </button>
@@ -312,29 +214,42 @@ export default function Page() {
           ))}
         </div>
 
-        {/* Activity / Log */}
-        <section className="mt-8 bg-white rounded-lg shadow p-4">
-          <div className="flex items-center justify-between mb-3">
-            <h3 className="text-lg font-semibold text-gray-700">
-              Activity Log
-            </h3>
-            <small className="text-sm text-gray-500">Recent messages</small>
+        <div className="mt-8 bg-white rounded-lg shadow p-6">
+          <h2 className="text-lg font-semibold mb-4">Kontrol Servo</h2>
+          <p className="mb-2">Status: {servoStatus}</p>
+          <div className="flex gap-4">
+            <button
+              onClick={() => publish(TOPICS.servo, "OPEN")}
+              className="bg-blue-500 text-white px-4 py-2 rounded"
+            >
+              Buka
+            </button>
+            <button
+              onClick={() => publish(TOPICS.servo, "CLOSE")}
+              className="bg-gray-600 text-white px-4 py-2 rounded"
+            >
+              Tutup
+            </button>
           </div>
-          <div className="max-h-48 overflow-auto">
-            {log.length === 0 ? (
-              <div className="text-gray-500">No activity yet.</div>
-            ) : (
-              log.map((r, i) => (
-                <div
-                  key={i}
-                  className="py-2 border-b last:border-b-0 text-sm text-gray-700"
-                >
+        </div>
+
+        {isAdmin && (
+          <>
+            <div className="mt-8 bg-white rounded-lg shadow p-6">
+              <h2 className="text-lg font-semibold mb-2">Data Sensor</h2>
+              <p>{sensorData} CM</p>
+            </div>
+
+            <div className="mt-8 bg-white rounded-lg shadow p-4 max-h-48 overflow-auto text-sm">
+              <h3 className="font-semibold mb-2">Activity Log</h3>
+              {log.map((r, i) => (
+                <div key={i} className="border-b last:border-none py-1">
                   {r}
                 </div>
-              ))
-            )}
-          </div>
-        </section>
+              ))}
+            </div>
+          </>
+        )}
       </main>
     </div>
   );
