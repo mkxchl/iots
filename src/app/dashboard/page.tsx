@@ -7,6 +7,7 @@ import { useRouter } from "next/navigation";
 import { auth } from "../../../lib/firebase";
 import { doc, getDoc } from "firebase/firestore";
 import { db } from "../../../lib/firebase";
+import Swal from "sweetalert2";
 
 const TOPICS = {
   dapur: "lampu/dapur",
@@ -67,9 +68,33 @@ export default function Page() {
         router.push("/login");
         return;
       }
+
       try {
         const snap = await getDoc(doc(db, "users", u.uid));
         setIsAdmin(snap.exists() && snap.data().role === "admin");
+
+        // ✅ Alert hanya sekali saat login
+        const hasShown = sessionStorage.getItem("loginAlertShown");
+        if (!hasShown) {
+          const Toast = Swal.mixin({
+            toast: true,
+            position: "top-end",
+            showConfirmButton: false,
+            timer: 3000,
+            timerProgressBar: true,
+            didOpen: (toast) => {
+              toast.onmouseenter = Swal.stopTimer;
+              toast.onmouseleave = Swal.resumeTimer;
+            },
+          });
+
+          Toast.fire({
+            icon: "success",
+            title: `Selamat datang ${u.displayName || "User"} 👋`,
+          });
+
+          sessionStorage.setItem("loginAlertShown", "true");
+        }
       } catch {
         setIsAdmin(false);
       }
@@ -144,14 +169,33 @@ export default function Page() {
     client.publish(topic, message);
   };
 
-  // ✅ Toggle Sensor ON/OFF
-
+  // ✅ Logout dengan konfirmasi
   const handleLogout = async () => {
-    try {
-      await signOut(auth);
-      router.push("/login");
-    } catch {
-      alert("Gagal logout");
+    const result = await Swal.fire({
+      title: "Yakin mau logout?",
+      text: "Kamu akan keluar dari aplikasi.",
+      icon: "warning",
+      showCancelButton: true,
+      confirmButtonColor: "#d33",
+      cancelButtonColor: "#3085d6",
+      confirmButtonText: "Ya, logout",
+      cancelButtonText: "Batal",
+    });
+
+    if (result.isConfirmed) {
+      try {
+        await signOut(auth);
+        sessionStorage.removeItem("loginAlertShown"); // reset supaya bisa muncul lagi nanti
+        Swal.fire({
+          icon: "success",
+          title: "Berhasil Logout",
+          timer: 1500,
+          showConfirmButton: false,
+        });
+        router.push("/login");
+      } catch {
+        Swal.fire("Error", "Gagal logout", "error");
+      }
     }
   };
 
@@ -164,31 +208,30 @@ export default function Page() {
             <div className="text-2xl font-bold text-indigo-600">IoT App</div>
 
             <div className="flex items-center space-x-4">
-  <img
-    src={user?.photoURL || "/default-avatar.png"}
-    alt="User Profile"
-    className="w-8 h-8 rounded-full border"
-  />
+              <img
+                src={user?.photoURL || "/default-avatar.png"}
+                alt="User Profile"
+                className="w-8 h-8 rounded-full border"
+              />
 
-  {/* kalau role admin, munculkan icon setting */}
-  {isAdmin && (
-    <button
-      onClick={() => router.push("../admin")}
-      className="text-gray-600 hover:text-black"
-      title="Admin Settings"
-    >
-      <i className="bx bx-cog text-2xl"></i>
-    </button>
-  )}
+              {/* kalau role admin, munculkan icon setting */}
+              {isAdmin && (
+                <button
+                  onClick={() => router.push("../admin")}
+                  className="text-gray-600 hover:text-black"
+                  title="Admin Settings"
+                >
+                  <i className="bx bx-cog text-2xl"></i>
+                </button>
+              )}
 
-  <button
-    onClick={handleLogout}
-    className="text-black text-sm px-3 py-1 border-none rounded hover:bg-red-500 hover:text-white transition-colors cursor-pointer"
-  >
-    Logout
-  </button>
-</div>
-
+              <button
+                onClick={handleLogout}
+                className="text-black text-sm px-3 py-1 border-none rounded hover:bg-red-500 hover:text-white transition-colors cursor-pointer"
+              >
+                Logout
+              </button>
+            </div>
           </div>
         </div>
       </header>
