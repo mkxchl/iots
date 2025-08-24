@@ -92,14 +92,14 @@ export default function AdminSettings() {
       {/* 🔙 Button Back */}
       <button
         onClick={() => router.back()}
-        className="flex items-center gap-2 text-indigo-600 hover:text-indigo-800 mb-6 transition-colors"
+        className="flex items-center gap-2 text-indigo-600 hover:text-indigo-800 mb-6 transition-colors cursor-pointer"
       >
         <ArrowLeft size={20} />
         <span className="font-medium">Kembali</span>
       </button>
 
       <h1 className="text-3xl font-bold mb-8 text-indigo-700">
-        Admin Panel - Manajemen User
+        Admin Panel
       </h1>
 
       {/* Grid Cards */}
@@ -130,7 +130,7 @@ export default function AdminSettings() {
 
             <button
               onClick={() => handleDelete(u.uid)}
-              className="bg-red-500 text-white px-4 py-1.5 rounded-lg hover:bg-red-600 transition-colors text-sm shadow"
+              className="bg-red-500 text-white px-4 py-1.5 rounded-full hover:bg-white hover:text-black transition-colors text-sm shadow cursor-pointer w-full"
             >
               Hapus
             </button>
